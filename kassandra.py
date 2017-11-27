@@ -10,8 +10,6 @@ from operator import mul
 from multiprocessing import Pool
 from numpy.linalg import lstsq
 
-
-
 __author__ = "Filipe Condessa"
 __copyright__ = "Filipe Condessa, 2017"
 __maintainer__ = "Filipe Condessa"
@@ -209,11 +207,12 @@ class CBM_TENSOR():
     def project_filters_low_rank(self,filters):
         # TODO
         # self.filters = projection(self.filters,list_of_dimensions)
-        self.spectralize_filters(self.filters)
+        #self.spectralize_filters(self.filters)
         # update spectral filters
         # update vectorized spectral filters
 
 def projection(single_filter,list_of_dimensions,max_dims):
+    ''' projection of a single filter'''
     result = []
     possible_dims = set(range(max_dims))
     for dimensions in list_of_dimensions:
@@ -225,9 +224,16 @@ def projection(single_filter,list_of_dimensions,max_dims):
     output = reduce(lambda x, y: y*x,result)
     output = output/output.sum()*single_filter.sum()
     return output
-        
 
-
+def projection_all_filters(filters,list_of_dimensions,max_dims):
+    ''' does the projection for all the filters'''
+    out_filters = []
+    for filt_id in range(len(filters)):
+        res = []
+        for dim_filter in filters[filt_id]:
+            res.append(projection(dim_filter),list_of_dimensions,max_dims)
+        out_filters.append(res)
+    return out_filters
 
 
 def fconv(X,Y):
