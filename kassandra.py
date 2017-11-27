@@ -46,13 +46,15 @@ def solve_parallel_problem(problem,num_processes = 4):
         return [val for sublist in part_solved for val in sublist]
 
 def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
+    '''Yield successive n-sized chunks from l.'''
+    # code copied from stackoverflow
     for i in range(0, len(l), n):
         yield l[i:i + n]
 
 class CBM_TENSOR():
-    ""
+    ''' Class that implements the Convolutional Bayesian Tensor'''
     def __init__(self):
+        '''Initialization of class'''
         self.data = np.array([])
         self.fixed = {}
         self.num_filters = 0
@@ -76,6 +78,7 @@ class CBM_TENSOR():
         self.PARALLEL = True
     def fit(self, data, num_filters=4, shape_filter=[5,5,5], normalize=True, hotstart=False, inp_filters=np.array([]),
             num_iters=10, th=0.1):
+        ''' Populate the CBM tensors'''
         self.data = data
         self.shape = data[0].shape
         self.sparsify_filter = False
@@ -200,14 +203,35 @@ class CBM_TENSOR():
     # def rec(self):
     #     # special test case now
     #     return ifft(np.array(self.spectral_activations)[:,np.newaxis,:] * np.array(self.spectral_filters),axis=2).sum(axis=0).T
-    def diff_c(self):
-        d = np.array(self.data).T - self.rec()
-        self.diff.append(np.abs(d).sum(axis=0))
+    # def diff_c(self):
+    #     d = np.array(self.data).T - self.rec()
+    #     self.diff.append(np.abs(d).sum(axis=0))
+    def project_filters_low_rank(self,filters):
+        # TODO
+        # self.filters = projection(self.filters,list_of_dimensions)
+        self.spectralize_filters(self.filters)
+        # update spectral filters
+        # update vectorized spectral filters
+
+def projection(single_filter,list_of_dimensions,max_dims):
+    result = []
+    possible_dims = set(range(max_dims))
+    for dimensions in list_of_dimensions:
+        target_dims = tuple(possible_dims.difference(dimensions))
+        auxa =  np.array(single_filter.mean(axis=target_dims),ndmin=max_dims)
+        for iter_dim in range(len(dimensions)):
+            auxa = np.swapaxes(auxa,dimensions[iter_dim],max_dims-len(dimensions)+iter_dim)
+        result.append(auxa)
+    output = reduce(lambda x, y: y*x,result)
+    output = output/output.sum()*single_filter.sum()
+    return output
+        
+
+
 
 
 def fconv(X,Y):
     ''' performs multidimensional convolution in spectral domain
-
     convolves X and Y by computing the n-dimensional fourier transforms of
     X with the size of Y '''
     # check if X and Y have the same number of dimensions
@@ -282,3 +306,9 @@ class Prediction_Engine:
         # Synthetize output from activation of Xtest
         return np.array([[fconv(self.synthesis.filters[filt_id][dim], compute_analysis.activations[filt_id]) for
                               dim in range(self.synthesis.dim)] for filt_id in range(self.num_filters)]).sum(axis=0)
+
+
+
+test = np.ones((5,5,5,5)) * np.eye(5,5)[:,:,np.newaxis,np.newaxis]
+dims_to_project = [[0,1],[2],[3]]
+res = projection(test,dims_to_project,len(test.shape))
