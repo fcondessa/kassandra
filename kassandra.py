@@ -43,11 +43,54 @@ def solve_parallel_problem(problem,num_processes = 4):
         part_solved = [solve_problem(elem) for elem in chunks(problem, len(problem) / 2)]
         return [val for sublist in part_solved for val in sublist]
 
+# general functions
+
 def chunks(l, n):
     '''Yield successive n-sized chunks from l.'''
     # code copied from stackoverflow
     for i in range(0, len(l), n):
         yield l[i:i + n]
+
+def sanitize_nan(input):
+    TOL = 1E-15
+    input[np.isnan(input)] = TOL
+    return input
+
+def projection(single_filter,list_of_dimensions,max_dims):
+    ''' projection of a single filter'''
+    result = []
+    possible_dims = set(range(max_dims))
+    for dimensions in list_of_dimensions:
+        target_dims = tuple(possible_dims.difference(dimensions))
+        auxa =  np.array(single_filter.mean(axis=target_dims),ndmin=max_dims)
+        for iter_dim in range(len(dimensions)):
+            auxa = np.swapaxes(auxa,dimensions[iter_dim],max_dims-len(dimensions)+iter_dim)
+        result.append(auxa)
+    output = reduce(lambda x, y: y*x,result)
+    output = output/output.sum()*single_filter.sum()
+    return output
+
+def projection_all_filters(filters,list_of_dimensions,max_dims):
+    ''' does the projection for all the filters'''
+    out_filters = []
+    for filt_id in range(len(filters)):
+        res = []
+        for dim_filter in filters[filt_id]:
+            res.append(projection(dim_filter,list_of_dimensions,max_dims))
+        out_filters.append(res)
+    return out_filters
+
+
+def fconv(X,Y):
+    ''' performs multidimensional convolution in spectral domain
+    convolves X and Y by computing the n-dimensional fourier transforms of
+    X with the size of Y '''
+    # check if X and Y have the same number of dimensions
+    assert len(X.shape) == len(Y.shape)
+    # check if size of X is never larger than the size of Y in all dimensions
+    assert all([X.shape[i] <= Y.shape[i] for i in range(len(X.shape))])
+    b = fftn(X,s=Y.shape)*fftn(Y)
+    return np.real(ifftn(b))
 
 class CBM_TENSOR():
     ''' Class that implements the Convolutional Bayesian Tensor'''
@@ -74,7 +117,7 @@ class CBM_TENSOR():
         self.flip_th = 0.85
         self.VERBOSE = False
         self.PARALLEL = True
-    def fit(self, data, num_filters=4, shape_filter=[5,5,5], normalize=True, hotstart=False, inp_filters=np.array([]),
+    def fit(self,data =  [], num_filters=4, shape_filter=[5,5,5], normalize=True, hotstart=False, inp_filters=np.array([]),
             num_iters=10, th=0.1):
         ''' Populate the CBM tensors'''
         self.data = data
@@ -126,9 +169,9 @@ class CBM_TENSOR():
                 [[self.vectorized_spectral_filters[filt][dim][pos] + self.robust_noise_value*np.random.randn() for filt in range(self.num_filters)] for dim in
                  range(self.dim)]) for pos in range(self.n_pts)]
         else:
-            A = [np.array(
+            A = [sanitize_nan(np.array(
                 [[self.vectorized_spectral_filters[filt][dim][pos] for filt in range(self.num_filters)] for dim in
-                 range(self.dim)]) for pos in range(self.n_pts)]
+                 range(self.dim)]) ) for pos in range(self.n_pts)]
         self.problem = [(A[iter_i],b[iter_i]) for iter_i in range(self.n_pts)]
         # run the solver
         #ld('assembling problem list for activations')
@@ -154,7 +197,7 @@ class CBM_TENSOR():
     def solve_filter(self):
         b = self.precomp_data
         #ld('assembling problem list for filters')
-        A = [ self.aux_solve_filter(np.array([self.vectorized_spectral_activations[iter_i][pos] for iter_i in range(self.num_filters)])) for pos in range(self.n_pts) ]
+        A = [ sanitize_nan( self.aux_solve_filter(np.array([self.vectorized_spectral_activations[iter_i][pos] for iter_i in range(self.num_filters)]))) for pos in range(self.n_pts) ]
         self.problem = [(A[iter_i],b[iter_i]) for iter_i in range(self.n_pts)]
         aux = self.solve_problem()
         vaux = [g.reshape((self.dim,self.num_filters)) for g in aux]
@@ -204,48 +247,11 @@ class CBM_TENSOR():
     # def diff_c(self):
     #     d = np.array(self.data).T - self.rec()
     #     self.diff.append(np.abs(d).sum(axis=0))
-    def project_filters_low_rank(self,filters):
-        # TODO
-        # self.filters = projection(self.filters,list_of_dimensions)
-        #self.spectralize_filters(self.filters)
-        # update spectral filters
-        # update vectorized spectral filters
+    def project_filters_low_rank(self,list_of_dimensions):
+        max_dims = max([max(elem) for elem in list_of_dimensions])+1
+        self.filters = projection_all_filters(self.filters, list_of_dimensions, max_dims)
+        self.spectralize_filters(self.filters)
 
-def projection(single_filter,list_of_dimensions,max_dims):
-    ''' projection of a single filter'''
-    result = []
-    possible_dims = set(range(max_dims))
-    for dimensions in list_of_dimensions:
-        target_dims = tuple(possible_dims.difference(dimensions))
-        auxa =  np.array(single_filter.mean(axis=target_dims),ndmin=max_dims)
-        for iter_dim in range(len(dimensions)):
-            auxa = np.swapaxes(auxa,dimensions[iter_dim],max_dims-len(dimensions)+iter_dim)
-        result.append(auxa)
-    output = reduce(lambda x, y: y*x,result)
-    output = output/output.sum()*single_filter.sum()
-    return output
-
-def projection_all_filters(filters,list_of_dimensions,max_dims):
-    ''' does the projection for all the filters'''
-    out_filters = []
-    for filt_id in range(len(filters)):
-        res = []
-        for dim_filter in filters[filt_id]:
-            res.append(projection(dim_filter),list_of_dimensions,max_dims)
-        out_filters.append(res)
-    return out_filters
-
-
-def fconv(X,Y):
-    ''' performs multidimensional convolution in spectral domain
-    convolves X and Y by computing the n-dimensional fourier transforms of
-    X with the size of Y '''
-    # check if X and Y have the same number of dimensions
-    assert len(X.shape) == len(Y.shape)
-    # check if size of X is never larger than the size of Y in all dimensions
-    assert all([X.shape[i] <= Y.shape[i] for i in range(len(X.shape))])
-    b = fftn(X,s=Y.shape)*fftn(Y)
-    return np.real(ifftn(b))
 
 class Prediction_Engine:
     def __init__(self):
@@ -314,10 +320,47 @@ class Prediction_Engine:
                               dim in range(self.synthesis.dim)] for filt_id in range(self.num_filters)]).sum(axis=0)
 
 
-# class CBM():
-#     def __init__(self):
-#         self
-        
-# test = np.ones((5,5,5,5)) * np.eye(5,5)[:,:,np.newaxis,np.newaxis]
-# dims_to_project = [[0,1],[2],[3]]
-# res = projection(test,dims_to_project,len(test.shape))
+class RCBM():
+    '''implements the tensor RCBM '''
+    # example of usage
+    # R = RCBM(depth = depth_val,list_of_dimensions=[[0],[1,2]], magic_th = 1E-9)
+    # R.fit_all(depth=depth_val,data=processed_tensor)
+    # R.run_all(niters = 10)
+    #
+    def __init__(self,depth = 3, magic_th = 5E-10,list_of_dimensions = []):
+        self.depth = depth
+        self.list_of_dim = list_of_dimensions
+        self.level = [CBM_TENSOR() for _ in range(depth)]
+        self.magic_th = magic_th
+    def fit(self,level, data=[]):
+        assert level >= 0
+        if level == 0:
+            self.level[level].fit(data)
+            self.level[level].initialize_filters()
+            self.level[level].initialize_activation()
+        else:
+            assert hasattr(self.level[level-1],'activations')
+            self.level[level].fit(self.level[level-1].activations)
+            self.level[level].initialize_filters()
+            self.level[level].initialize_activation()
+    def fit_all(self,depth=1,data = []):
+        for level_id in range(depth):
+            if level_id == 0:
+                self.fit(level_id,data)
+            else:
+                self.fit(level_id)
+    def run(self,level,n_iters):
+        self.level[level].project_filters_low_rank(self.list_of_dim)
+        for _ in range(n_iters):
+            self.level[level].solve_activation()
+            # apply prior on activations
+            self.level[level].activations = [self.level[level].soft(activation, self.magic_th) for activation in self.level[level].activations]
+            self.level[level].solve_filter()
+            self.level[level].project_filters_low_rank(self.list_of_dim)
+        if level < len(self.level)-1:
+            self.level[level+1].fit(self.level[level].activations)
+    def run_all(self,n_iters=2):
+        for level_id in range(len(self.level)):
+            print level_id
+            self.run(level_id,n_iters)
+
