@@ -314,7 +314,10 @@ class Prediction_Engine:
                               dim in range(self.synthesis.dim)] for filt_id in range(self.num_filters)]).sum(axis=0)
 
 
-
-test = np.ones((5,5,5,5)) * np.eye(5,5)[:,:,np.newaxis,np.newaxis]
-dims_to_project = [[0,1],[2],[3]]
-res = projection(test,dims_to_project,len(test.shape))
+# class CBM():
+#     def __init__(self):
+#         self
+        
+# test = np.ones((5,5,5,5)) * np.eye(5,5)[:,:,np.newaxis,np.newaxis]
+# dims_to_project = [[0,1],[2],[3]]
+# res = projection(test,dims_to_project,len(test.shape))
