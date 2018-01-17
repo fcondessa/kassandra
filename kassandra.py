@@ -16,26 +16,27 @@ __maintainer__ = "Filipe Condessa"
 __email__ = "fcondessa@gmail.com"
 __status__ = "prototype"
 
-# functions that mplement parallel solving of linear problems
-def funct(arg1):
+# functions that implement parallel solving of linear problems
+def lstsq_wrapper(arg1):
     '''Wrapper for least squares so that works with single input'''
     return lstsq(arg1[0],arg1[1])[0]
 
 def solve_problem(problem):
-    '''Solves sequentially list of linear problems using funct wrapper for least squares'''
+    '''Solves sequentially list of linear problems using the lstsq_wrapper for least squares'''
     solved_problem = [[] for _ in range(len(problem))]
     for iter_i in range(len(problem)):
-        solved_problem[iter_i]  = funct(problem[iter_i])
+        solved_problem[iter_i]  = lstsq_wrapper(problem[iter_i])
     return solved_problem
 
 def solve_parallel_problem(problem,num_processes = 4):
     '''Solves in parallel list of linear problems using funct wrapper for least squares'''
     try:
         pool = Pool(processes=num_processes)
-        result = pool.map(funct, problem)
+        result = pool.map(lstsq_wrapper, problem)
         pool.close()
         return result
     except OSError:
+        # ugly solution to make sure no lsqtsq processes remain alive
         try:
             pool.close()
         except:
@@ -52,8 +53,9 @@ def chunks(l, n):
         yield l[i:i + n]
 
 def sanitize_nan(input):
-    TOL = 1E-15
-    input[np.isnan(input)] = TOL
+    '''replacing nan by a positive EPS'''
+    EPS = 1E-15
+    input[np.isnan(input)] = EPS
     return input
 
 def projection(single_filter,list_of_dimensions,max_dims):
@@ -321,7 +323,7 @@ class Prediction_Engine:
 
 
 class RCBM():
-    '''implements the tensor RCBM '''
+    '''implements a Spectral Tensorial Recursive Convolution '''
     # example of usage
     # R = RCBM(depth = depth_val,list_of_dimensions=[[0],[1,2]], magic_th = 1E-9)
     # R.fit_all(depth=depth_val,data=processed_tensor)
