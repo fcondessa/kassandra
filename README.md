@@ -8,3 +8,4 @@ This is done in a two step fashion:
   2) Find a decomposition of Y that shares the same activation filters as in 1), such that Y is a finite sum of convolutions of analysis filters with the activations H
     Y = \sum G_k* H_k
     
+The draft of the mathematical formulation can be found in the white paper folder.
