@@ -1,0 +1,93 @@
+\documentclass[12pt, a4paper, twoside,draft]{article}
+\usepackage{amsmath}
+\usepackage{framed}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+\title{CASSANDRA (draft)\\ A framework for tensorial prediction \\ v0.1}
+
+
+\date{\today}
+% \date{\today} date coulde be today
+% \date{25.12.00} or be a certain date
+% \date{ } or there is no date
+\begin{document}
+\maketitle
+
+\section{Abstract}
+We present a method for tensorial prediction using a convolutional blind decomposition approach (filters convolved with activations) where the activation variables are shared between the input and the output.
+
+\section{A framework for tensor evolution prediction using a tensor-based spectral convolutional method}
+
+\subsection{Analysis Formulation - Multiple Tensors + Spectral Data fit}
+Let $\mathbf{X} = [\mathbf{X}_1, \hdots, \mathbf{X}_D ]$ be a collection of $D$ tensors.
+\begin{framed}
+\textbf{Analysis formulation:} Identification of a common compositional structure (filters) among the $D$ tensors such that the $D$ tensors can be reconstructed, within a margin of error, by a finite sum of tensorial convolutions of the compositional structures (filters) and an activations of the compositional structures (activations).
+\end{framed}
+This can be achieved through the following optimization problem:
+\begin{align}
+f, \left[ \begin{matrix}h_1 \\ \vdots \\ h_D \end{matrix} \right] = \arg \min_{f,h} \left\Vert \left[ \begin{matrix}\mathbf{X}_1 \\ \vdots \\ \mathbf{X}_D \end{matrix} \right] - \sum_k f_k \ast  \left[ \begin{matrix}h_{1,k} \\ \vdots \\ h_{D,k} \end{matrix} \right] \right\Vert,
+\end{align}
+where $f_j$ denotes the $j$th compositional structure (filter) and $h_{i,j}$ denotes the activation of the $j$th compositional structure on the $i$th tensor ($X_i$).
+This problem is biconvex and, generally, ill-defined, as the solution might not be unique (multiple combinations of filters and activations can reconstruct the collection of tensors).
+To address the biconvexity of the problem, we find an approximate solution through an alternating optimization of the filters and their activations, in convex subproblems (addressed further ahead).
+To address the fact that this optimization problem can be ill-defined, we can introduce priors on the activations (\emph{e.g.} sparse activations, activations smooth or piecewise smooth activations in specific dimensions, ...) or in the filters (\emph{e.g.} filters with fixed components in a number of dimensions, smooth or piecewise smooth activations in specific dimensions, ...).
+Our problem becomes then:
+\begin{align}
+f, \left[ \begin{matrix}h_1 \\ \vdots \\ h_D \end{matrix} \right] = \arg \min_{f,h} \underbrace{\left\Vert \left[ \begin{matrix}\mathbf{X}_1 \\ \vdots \\ \mathbf{X}_D \end{matrix} \right] - \sum_k f_k \ast  \left[ \begin{matrix}h_{1,k} \\ \vdots \\ h_{D,k} \end{matrix} \right] \right\Vert }_{\textrm{data fit}} + \underbrace{\mathcal{P}_h(h) + \mathcal{P}_f(f) }_\textrm{prior information},
+\end{align}
+where $\mathcal{P}_h(h)$ denotes a prior on the activations and $\mathcal{P}_f(f)$ denotes a prior on the filters.
+
+The solution of the data fit component of the optimization problem is computationally challenging as the data and the filters increase in number of dimensions and size.
+We note however, that we can efficiently solve the data fit problem in the spectral domain as
+\begin{align}
+  \arg \min_{f,h} & \left\Vert \left[ \begin{matrix}\mathbf{X}_1 \\ \vdots \\ \mathbf{X}_D \end{matrix} \right] - \sum_k f_k \ast  \left[ \begin{matrix}h_{1,k} \\ \vdots \\ h_{D,k} \end{matrix} \right] \right\Vert  &=   \nonumber \\
+  \arg \min_{f,h} & \left\Vert \mathcal{F}\left(\left[ \begin{matrix}\mathbf{X}_1 \\ \vdots \\ \mathbf{X}_D \end{matrix} \right] - \sum_k f_k \ast  \left[ \begin{matrix}h_{1,k} \\ \vdots \\ h_{D,k} \end{matrix} \right] \right) \right\Vert & = \nonumber \\
+  \arg \min_{f,h} & \left\Vert \mathcal{F}\left(\left[ \begin{matrix}\mathbf{X}_1 \\ \vdots \\ \mathbf{X}_D \end{matrix} \right] \right) - \mathcal{F}\left(\sum_k f_k \ast  \left[ \begin{matrix}h_{1,k} \\ \vdots \\ h_{D,k} \end{matrix} \right] \right) \right\Vert & = \nonumber \\
+  \arg \min_{f,h} & \left\Vert \mathcal{F}\left(\left[ \begin{matrix}\mathbf{X}_1 \\ \vdots \\ \mathbf{X}_D \end{matrix} \right] \right) - \sum_k \mathcal{F}(f_k)   \mathcal{F}\left(\left[ \begin{matrix}h_{1,k} \\ \vdots \\ h_{D,k} \end{matrix} \right] \right) \right\Vert &
+\end{align}
+where $\mathcal{F}$ denotes the Fourier transform.
+
+\subsection{Prediction Formulation}
+Let $\mathbf{X} = [\mathbf{X}_1, \hdots, \mathbf{X}_D ]$ be a collection of $D$ tensors representing $D$ different social signals, and
+$\mathbf{Y} = [\mathbf{Y}_1, \hdots, \mathbf{Y}_M]$ a collection of $M$ tensors representing $M$ target social signals (social signals we want to predict).
+Our goal is the estimation of $\mathbf{Y}$ from the knowledge of the \emph{directed} patterns of interaction $\mathbf{X} \rightarrow \mathbf{Y}$.
+
+The  estimation of the directed patterns of interaction allows not only to understand patterns of interaction from a causality point of view (not approached in this document) but also to estimate $\mathbf{Y}$ given $\mathbf{X}$.
+This is of utmost importance in the prediction of time-series and tensor evolution.
+
+We approach the problem from the same approach as the analysis part.
+\begin{align}
+f_1,h_1 = \arg\min_{f,h} \| \mathbf{X} - \sum_{k=1}^{k_1} f_k \ast h_k \| + \mathcal{P}_h(h) + \mathcal{P}_f(f),
+\end{align}
+where $\mathcal{P}_h$ and  $\mathcal{P}_f$ denote priors on the activations and filters, respectively.
+This problem can be solved in the spectral domain as follows,
+\begin{align}
+f_1,h_1 = \arg\min_{f,h} \| \mathbf{X} -  \sum_{k=1}^{k_1}  \mathcal{F}(f_k)  \mathcal{F}(  h_k) \| + \mathcal{P}_h(h) + \mathcal{P}_f (f),
+\end{align}
+where $\mathcal{F}(.)$ denotes the Fourier transform operator.
+Assuming convexity of the priors on the activations and filters, this is a biconvex problem, which can be solved approximately as,
+\begin{align}
+  f^{t+1} = \arg\min_{f} \|  \mathcal{F}(\mathbf{X}) - \sum_{k=1}^{k_1}  \mathcal{F}(f_k)  \mathcal{F}(  h^{t}_k) \| + \mathcal{P}_f (f), \\
+ h^{t+1} = \arg\min_{h} \|  \mathcal{F}(\mathbf{X}) - \sum_{k=1}^{k_1}  \mathcal{F}(f^{t+1}_k) \mathcal{F}(  h_k) \| +  \mathcal{P}_h (h).
+\end{align}
+This corresponds to finding simultaneously the filters and the activations for $\mathbf{X}$.
+
+We then find the filters $g$ such that,
+\begin{align}
+g = \arg\min_{g} \|  \mathcal{F}(\mathbf{Y}) - \sum_{k=1}^{k_1}  \mathcal{F}(g_k) \mathcal{F}(  h_k) \| + \mathcal{P}_h(h) + \mathcal{P}_g(g).
+\end{align}
+This means that we find filters $g$ such that we can reconstruct $\mathbf{Y}$ from the filters $g$ and the activations derived from $\mathbf{X}$.
+
+The pair of filters $f$ and $g$ provide a path between the known and accessible $\mathbf{X}$ and the unknown and $\mathbf{Y}$,
+\begin{align}
+  \textrm{train} & \nonumber\\
+&  (\mathbf{X}_\textrm{train}) \rightarrow (\underline{f},h) \\
+  & (\mathbf{Y}_\textrm{train}, h) \rightarrow(\underline{g}) \\
+  \nonumber \\
+  \textrm{predict} & \nonumber \\
+  & (\mathbf{X}_\textrm{test}, \underline{f}) \rightarrow (h_\textrm{test})\\
+&  (h_\textrm{test}, \underline{g}) \rightarrow (\mathbf{Y}_\textrm{predicted})
+\end{align}
+
+\end{document}
